@@ -36,61 +36,8 @@ def serial_ports():
             pass
     return result
 
+# 可用串口
 coms = serial_ports()
-
-root = Tk()
-
-root.title('苏州奥丁电力-远程连接')
-
-# 默认值
-registerHexVal = 0
-registerVal='0'
-ipVal = '0.0.0.0'
-portVal = '80'
-
-# 读取配置文件
-if not os.path.exists('config.txt'):
-    with open('config.txt','w+') as f:
-        pass
-with open('config.txt','r') as f:
-    line = f.readline()
-    print(line)
-    if len(line)>0:
-        try:
-            dictData = json.loads(line)
-        except:
-            dictData = {}
-        registerHexVal = dictData['registerHex']
-        registerVal = dictData['register']
-        ipVal = dictData['ip']
-        portVal = dictData['port']
-
-root.resizable(width=True, height=True)
-root.config(background='#EEE')
-root.geometry('800x400')
-
-# 服务器参数
-# ip地址
-ip = tk.StringVar()
-ip.set(ipVal)
-# 端口
-port = tk.StringVar()
-port.set(portVal)
-# 注册码内容
-register = tk.StringVar()
-register.set(registerVal)
-# 是否启用十六进制，默认开启
-registerHex = tk.IntVar()
-registerHex.set(registerHexVal)
-
-serverProperties = ttk.Labelframe(root,text='服务器参数',padding=20)
-serverProperties.place(relx=0.01,rely=0.01)
-ttk.Label(serverProperties,text='IP:').grid(row=0,column=0,pady=5,sticky=E)
-ttk.Label(serverProperties,text='端口:').grid(row=1,column=0,pady=5,sticky=E)
-ttk.Label(serverProperties,text='注册码:').grid(row=2,column=0,pady=5,sticky=E)
-ttk.Entry(serverProperties,textvariable = ip).grid(row=0,column=1)
-ttk.Entry(serverProperties,textvariable = port).grid(row=1,column=1)
-ttk.Entry(serverProperties,textvariable = register).grid(row=2,column=1)
 
 def changeRegisterHex():
     newVal = registerHex.get()
@@ -104,25 +51,13 @@ def changeRegisterHex():
         prevRegister = register.get()
         register.set(eval('0x' + prevRegister))
 
-# 连接按钮    
-ttk.Checkbutton(serverProperties,text='HEX',variable=registerHex,onvalue = 1, offvalue = 0,command=changeRegisterHex).grid(row=2,column=2)
+
 
 # 连接
-
 running = False 
-def save(): 
-    global running
-    if running:
-        messagebox.showinfo(title='提示',message='运行中，请勿重复运行')
-        return
-    dict = {'registerHex':registerHex.get(),'register':register.get(),'ip':ip.get(),'port':port.get()}
-    with open('config.txt','w+') as f:
-        json.dump(dict,f)
-    myThread(1,"socketThread").start()
-    
-
 
 exitFlag = 0
+# socket 线程
 class  myThread(threading.Thread):
     def __init__(self, threadID, name):
         threading.Thread.__init__(self)
@@ -133,7 +68,7 @@ class  myThread(threading.Thread):
         connectSocket(self.name)
         print ("退出socket线程：" + self.name)
 
-# 读数据线程
+# 读数据 线程
 class readDataThread(threading.Thread):
     def __init__(self, ser,beginTime,client,data):
         threading.Thread.__init__(self)
@@ -157,26 +92,52 @@ class readDataThread(threading.Thread):
         if result:
             print('read data spend:{} ,data:{}'.format((datetime.datetime.now() - self.beginTime).total_seconds(),result))
             self.client.sendall(result)
-            
+
+class sendSocketHeart(threading.Thread):
+    def __init__(self,client):
+        threading.Thread.__init__(self)
+        global heartBeatContent
+        global heartBeatTime
+        self.heartBeatContent = heartBeatContent.get()
+        self.heartBeatTime = heartBeatTime.get()
+        self.client = client
+    def run(self):
+        global exitFlag
+        while not exitFlag:
+            time.sleep(self.heartBeatTime)
+            print('心跳：',self.heartBeatContent)
+            self.client.sendall(self.heartBeatContent.encode('utf-8'))
+
 # 连接socket
 client = socket.socket(socket.AF_INET,socket.SOCK_STREAM) 
 
+# 端口-连接 dict
 comsConnection = {}
+
+# 连接socket
 def connectSocket(threadName):
    
     client.setsockopt(socket.SOL_SOCKET,socket.SO_KEEPALIVE,1)
     # client.ioctl(socket.SIO_KEEPALIVE_VALS, (1, 10000, 3000))
 
     client.connect((ip.get(),int(port.get())))
+    global status
+    status.set(1)
     client.sendall(str.encode(register.get())) #发送注册码
+
+    # 开启心跳线程
+    global useHeartBeat
+    if useHeartBeat.get():
+        sendSocketHeart(client).start()
+
     print('socket连接成功')
     global running
     running = True
 
     for com in coms:
-        comConnect = serial.Serial(com,9600,timeout=0)
+        comConnect = serial.Serial(com,baudrateCmb.get(),timeout=0)
         comsConnection[com] = comConnect
-        print(com + '连接成功')
+        print(com + '打开成功')
 
     while True:
         if exitFlag:
@@ -187,9 +148,113 @@ def connectSocket(threadName):
             endWrite = datetime.datetime.now()
             for ser in comsConnection.values():
                 readDataThread(ser,endWrite,client,data).start()
-        
 
-ttk.Button(root,text='连接',command = save).place(relx=0.93, rely=0.95, anchor=CENTER)
+root = Tk()
+
+root.title('苏州奥丁电力-远程连接')
+
+# 默认值
+registerHexVal = 0
+registerVal='0'
+ipVal = '0.0.0.0'
+portVal = '80'
+baudrates=(50, 75, 110, 134, 150, 200, 300, 600, 1200, 1800, 2400, 4800, 9600, 19200, 38400, 57600, 115200)
+heartBeatTimeVal = 60
+useHeartBeatVal = True
+heartBeatContentVal = '0'
+statusVal = -1
+# 读取配置文件
+if not os.path.exists('config.txt'):
+    with open('config.txt','w+') as f:
+        pass
+with open('config.txt','r') as f:
+    line = f.readline()
+    print(line)
+    if len(line)>0:
+        try:
+            dictData = json.loads(line)
+        except:
+            dictData = {}
+        # registerHexVal = dictData['registerHex']
+        registerVal = dictData['register']
+        ipVal = dictData['ip']
+        portVal = dictData['port']
+        useHeartBeatVal = dictData['useHeartBeat']
+        heartBeatContentVal = dictData['heartBeatContent']
+        heartBeatTimeVal = dictData['heartBeatTime']
+        statusVal = dictData['status']
+
+root.resizable(width=False, height=False)
+root.config(background='#EEE')
+root.geometry('600x400')
+
+# 服务器参数
+# ip地址
+ip = tk.StringVar()
+ip.set(ipVal)
+# 端口
+port = tk.StringVar()
+port.set(portVal)
+# 注册码内容
+register = tk.StringVar()
+register.set(registerVal)
+# 是否启用十六进制，默认开启
+registerHex = tk.IntVar()
+registerHex.set(registerHexVal)
+
+serverProperties = ttk.Labelframe(root,text='服务器参数',padding=20)
+serverProperties.grid(row=0,column=0,sticky=N,padx=10,pady=10)
+ttk.Label(serverProperties,text='IP:').grid(row=0,column=0,pady=5,sticky=E)
+ttk.Label(serverProperties,text='端口:').grid(row=1,column=0,pady=5,sticky=E)
+ttk.Label(serverProperties,text='注册码:').grid(row=2,column=0,pady=5,sticky=E)
+ttk.Label(serverProperties,text='波特率:').grid(row=3   ,column=0,pady=5,sticky=E)
+ttk.Entry(serverProperties,textvariable = ip).grid(row=0,column=1,sticky=W)
+ttk.Entry(serverProperties,textvariable = port).grid(row=1,column=1,sticky=W)
+ttk.Entry(serverProperties,textvariable = register).grid(row=2,column=1,sticky=W)
+baudrateCmb = ttk.Combobox(serverProperties,values=baudrates)
+baudrateCmb.grid(row=3,column=1)
+baudrateCmb.current(12) 
+# 注册码 启用HEX
+# ttk.Checkbutton(serverProperties,text='HEX',variable=registerHex,onvalue = 1, offvalue = 0,command=changeRegisterHex).grid(row=2,column=2)
+
+# 心跳
+heartBeatContent = tk.StringVar()
+heartBeatContent.set(heartBeatContentVal)
+heartBeatTime = tk.IntVar()
+heartBeatTime.set(heartBeatTimeVal)
+# 是否启用心跳，默认开启
+useHeartBeat = tk.IntVar()
+useHeartBeat.set(useHeartBeatVal)
+heartBeatProperties = ttk.Labelframe(root,text='心跳',padding=10)
+heartBeatProperties.grid(row=0,column=1,sticky=N,rowspan=4,padx=10,pady=10)
+ttk.Checkbutton(heartBeatProperties,text='启用',variable=useHeartBeat,onvalue = 1, offvalue = 0).grid(row=0,column=0)
+
+ttk.Label(heartBeatProperties,text='心跳内容:').grid(row=1,column=0,pady=5,sticky=E)
+ttk.Label(heartBeatProperties,text='心跳时间:').grid(row=2,column=0,pady=5,sticky=E)
+ttk.Entry(heartBeatProperties,textvariable = heartBeatContent).grid(row=1,column=1,sticky=W)
+ttk.Entry(heartBeatProperties,textvariable = heartBeatTime).grid(row=2,column=1,sticky=W)
+
+# 状态
+status = tk.IntVar()
+status.set(statusVal)
+statusLabelFrame = ttk.Labelframe(root,text='状态',padding=10)
+statusLabelFrame.grid(row=1,column=0,sticky=W,rowspan=4,padx=10,pady=10)
+ttk.Radiobutton(statusLabelFrame,text='连接',variable=status,value=1).grid(row=0,column=0,sticky=W)
+ttk.Radiobutton(statusLabelFrame,text='未连接',variable=status,value=-1).grid(row=1,column=0,sticky=E)
+
+# 保存-连接
+def save(): 
+    global running
+    if running:
+        messagebox.showinfo(title='提示',message='运行中，请勿重复运行')
+        return
+    dict = {'register':register.get(),'ip':ip.get(),
+    'port':port.get(),'useHeartBeat':useHeartBeat.get(),'heartBeatContent':heartBeatContent.get(),'heartBeatTime':heartBeatTime.get(),'status':status.get()}
+    with open('config.txt','w+') as f:
+        json.dump(dict,f)
+    myThread(1,"socketThread").start()
+
+ttk.Button(root,text='连接',command = save).place(relx=0.9, rely=0.9, anchor=CENTER)
 
 # 窗口关闭监听
 def on_closing():

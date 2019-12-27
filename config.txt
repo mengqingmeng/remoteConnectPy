@@ -1,1 +1,1 @@
-{"registerHex": 0, "register": "0", "ip": "test.odin-china.com", "port": "8888"}
+{"register": "0", "ip": "odin-china.com", "port": "7007", "useHeartBeat": 1, "heartBeatContent": "1", "heartBeatTime": 6, "status": -1}
