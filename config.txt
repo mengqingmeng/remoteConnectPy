@@ -1,0 +1,1 @@
+{"registerHex": 0, "register": "0", "ip": "test.odin-china.com", "port": "8888"}
