@@ -1,1 +1,1 @@
-{"register": "0", "ip": "odin-china.com", "port": "7007", "useHeartBeat": 1, "heartBeatContent": "1", "heartBeatTime": 6, "status": -1}
+{"register": "3007", "ip": "127.0.0.1", "port": "7007", "useHeartBeat": 1, "heartBeatContent": "11", "heartBeatTime": 6, "status": -1}

@@ -2,10 +2,17 @@ import tkinter as tk
 from tkinter import *
 from tkinter import ttk,filedialog,messagebox
 import random
-import json,os,socket,threading,binascii,time
+import json,os,socket,threading,binascii,time,logging
 import serial
 import sys
 import glob,datetime,base64
+# 用来标记socket线程的连接状态
+running = False 
+
+exitFlag = 0
+
+# 配置log输出
+logging.basicConfig(filename='app.log',format='%(asctime)s %(filename)s[line:%(lineno)d] %(message)s',datefmt='%Y-%m-%d-%H-%M-%S')
 
 #获取可用端口
 def serial_ports():
@@ -46,17 +53,11 @@ def changeRegisterHex():
             prevRegister = int(register.get())
             register.set(hex(prevRegister)[2:])
         except:
+            logging.warning("输入注册包格式不正确："+register.get())
             messagebox.showinfo(title='提示',message='请输入纯数字注册包')
     if(newVal == 0):
         prevRegister = register.get()
         register.set(eval('0x' + prevRegister))
-
-
-
-# 连接
-running = False 
-
-exitFlag = 0
 # socket 线程
 class  myThread(threading.Thread):
     def __init__(self, threadID, name):
@@ -64,9 +65,13 @@ class  myThread(threading.Thread):
         self.threadID = threadID
         self.name = name
     def run(self):
-        print ("开始socket线程：" + self.name)
-        connectSocket(self.name)
-        print ("退出socket线程：" + self.name)
+        logging.info ("开始socket线程：" + self.name)
+        try:
+            connectSocket(self,self.name)
+        except:
+            logging.error('socket连接异常')
+            status.set(-2)        
+        logging.info("退出socket线程：" + self.name)
 
 # 读数据 线程
 class readDataThread(threading.Thread):
@@ -90,7 +95,7 @@ class readDataThread(threading.Thread):
                 if result:
                     break
         if result:
-            print('read data spend:{} ,data:{}'.format((datetime.datetime.now() - self.beginTime).total_seconds(),result))
+            logging.info('read data spend:{} ,data:{}'.format((datetime.datetime.now() - self.beginTime).total_seconds(),result))
             self.client.sendall(result)
 
 class sendSocketHeart(threading.Thread):
@@ -102,11 +107,15 @@ class sendSocketHeart(threading.Thread):
         self.heartBeatTime = heartBeatTime.get()
         self.client = client
     def run(self):
-        global exitFlag
         while not exitFlag:
+            logging.info('发送心跳：' + self.heartBeatContent)
             time.sleep(self.heartBeatTime)
-            print('心跳：',self.heartBeatContent)
-            self.client.sendall(self.heartBeatContent.encode('utf-8'))
+            try:
+                self.client.sendall(self.heartBeatContent.encode('utf-8'))
+            except:
+                logging.error("发送心跳失败")
+                global status
+                status.set(-2) # 异常
 
 # 连接socket
 client = socket.socket(socket.AF_INET,socket.SOCK_STREAM) 
@@ -115,34 +124,44 @@ client = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
 comsConnection = {}
 
 # 连接socket
-def connectSocket(threadName):
+def connectSocket(self,threadName):
    
     client.setsockopt(socket.SOL_SOCKET,socket.SO_KEEPALIVE,1)
     # client.ioctl(socket.SIO_KEEPALIVE_VALS, (1, 10000, 3000))
-
-    client.connect((ip.get(),int(port.get())))
-    global status
-    status.set(1)
-    client.sendall(str.encode(register.get())) #发送注册码
+    try:
+        client.connect((ip.get(),int(port.get())))
+        client.sendall(register.get().encode()) #发送注册码
+    except:
+        logging.error('socket连接服务器失败')
+        client.close()
+    
 
     # 开启心跳线程
-    global useHeartBeat
+    global useHeartBeat 
     if useHeartBeat.get():
         sendSocketHeart(client).start()
-
-    print('socket连接成功')
+    status.set(1)
+    logging.info('socket连接成功')
     global running
     running = True
 
     for com in coms:
         comConnect = serial.Serial(com,baudrateCmb.get(),timeout=0)
         comsConnection[com] = comConnect
-        print(com + '打开成功')
-
+        logging.info(com + '打开成功')
     while True:
         if exitFlag:
-            threadName.exit()
-        data = client.recv(1024)
+            running = False
+            status.set(-1)
+            logging.info('退出socket线程')
+            client.close()
+            break
+        try:
+            data = client.recv(1024)
+        except:     
+            logging.error('获取socket数据失败')
+            status.set(-2) # 异常
+            exitFlag = 1   
         if data:
             # 遍历连接的串口
             endWrite = datetime.datetime.now()
@@ -235,12 +254,14 @@ ttk.Entry(heartBeatProperties,textvariable = heartBeatContent).grid(row=1,column
 ttk.Entry(heartBeatProperties,textvariable = heartBeatTime).grid(row=2,column=1,sticky=W)
 
 # 状态
+global status
 status = tk.IntVar()
 status.set(statusVal)
 statusLabelFrame = ttk.Labelframe(root,text='状态',padding=10)
 statusLabelFrame.grid(row=1,column=0,sticky=W,rowspan=4,padx=10,pady=10)
-ttk.Radiobutton(statusLabelFrame,text='连接',variable=status,value=1).grid(row=0,column=0,sticky=W)
-ttk.Radiobutton(statusLabelFrame,text='未连接',variable=status,value=-1).grid(row=1,column=0,sticky=E)
+ttk.Radiobutton(statusLabelFrame,text='连接',variable=status,value=1,state='disabled').grid(row=0,column=0,sticky=W)
+ttk.Radiobutton(statusLabelFrame,text='未连接',variable=status,value=-1,state='disabled').grid(row=1,column=0,sticky=W)
+ttk.Radiobutton(statusLabelFrame,text='异常',variable=status,value=-2,state='disabled').grid(row=2,column=0,sticky=W)
 
 # 保存-连接
 def save(): 
@@ -259,12 +280,13 @@ ttk.Button(root,text='连接',command = save).place(relx=0.9, rely=0.9, anchor=C
 # 窗口关闭监听
 def on_closing():
     if messagebox.askokcancel("退出", "确定退出?"):
-        global exitFlag
         exitFlag = 1
         client.close()
         root.destroy()
+        logging.info('退出窗口，关闭coms')
         for ser in comsConnection.values():
             ser.close()
+        sys.exit()
 
 root.protocol("WM_DELETE_WINDOW", on_closing)
 
