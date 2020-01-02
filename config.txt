@@ -1,1 +1,1 @@
-{"register": "3007", "ip": "127.0.0.1", "port": "7007", "useHeartBeat": 1, "heartBeatContent": "11", "heartBeatTime": 6, "status": -1}
+{"register": "3007", "ip": "127.0.0.1", "port": "7007", "useHeartBeat": 1, "heartBeatContent": "11", "heartBeatTime": 600, "status": -2}

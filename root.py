@@ -2,7 +2,7 @@ import tkinter as tk
 from tkinter import *
 from tkinter import ttk,filedialog,messagebox
 import random
-import json,os,socket,threading,binascii,time,logging
+import json,os,socket,threading,binascii,time,logging,codecs,re
 import serial
 import sys
 import glob,datetime,base64
@@ -12,7 +12,7 @@ running = False
 exitFlag = 0
 
 # 配置log输出
-logging.basicConfig(filename='app.log',format='%(asctime)s %(filename)s[line:%(lineno)d] %(message)s',datefmt='%Y-%m-%d-%H-%M-%S')
+logging.basicConfig(filename='app.log',format='%(levelname)s %(asctime)s %(filename)s[line:%(lineno)d] %(message)s',datefmt='%Y-%m-%d-%H-%M-%S',level=logging.INFO)
 
 #获取可用端口
 def serial_ports():
@@ -65,7 +65,7 @@ class  myThread(threading.Thread):
         self.threadID = threadID
         self.name = name
     def run(self):
-        logging.info ("开始socket线程：" + self.name)
+        logging.info("开始socket线程：" + self.name)
         try:
             connectSocket(self,self.name)
         except:
@@ -86,7 +86,7 @@ class readDataThread(threading.Thread):
         self.ser.write(self.data)
         time.sleep(0.1)
         result = self.ser.read(100)
-        print(result)
+        logging.info("从设备获取数据："+ result)
         if not result:
             for i in range(10):
                 # print('读取失败，尝试第{}次'.format(i))
@@ -111,7 +111,7 @@ class sendSocketHeart(threading.Thread):
             logging.info('发送心跳：' + self.heartBeatContent)
             time.sleep(self.heartBeatTime)
             try:
-                self.client.sendall(self.heartBeatContent.encode('utf-8'))
+                self.client.sendall(str2HexBytes(self.heartBeatContent))
             except:
                 logging.error("发送心跳失败")
                 global status
@@ -123,6 +123,15 @@ client = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
 # 端口-连接 dict
 comsConnection = {}
 
+def str2HexBytes(str):
+    if not str:
+        return
+    arr = re.findall(r'.{2}',str)
+    result = []
+    for item in arr:
+        result.append(int(item,16))
+    return bytes(result)
+
 # 连接socket
 def connectSocket(self,threadName):
    
@@ -130,11 +139,11 @@ def connectSocket(self,threadName):
     # client.ioctl(socket.SIO_KEEPALIVE_VALS, (1, 10000, 3000))
     try:
         client.connect((ip.get(),int(port.get())))
-        client.sendall(register.get().encode()) #发送注册码
+        registerData = str2HexBytes(register.get())
+        client.sendall(registerData) #发送注册码
     except:
         logging.error('socket连接服务器失败')
         client.close()
-    
 
     # 开启心跳线程
     global useHeartBeat 
@@ -150,17 +159,12 @@ def connectSocket(self,threadName):
         comsConnection[com] = comConnect
         logging.info(com + '打开成功')
     while True:
-        if exitFlag:
-            running = False
-            status.set(-1)
-            logging.info('退出socket线程')
-            client.close()
-            break
         try:
             data = client.recv(1024)
         except:     
             logging.error('获取socket数据失败')
             status.set(-2) # 异常
+            global exitFlag
             exitFlag = 1   
         if data:
             # 遍历连接的串口
@@ -188,7 +192,7 @@ if not os.path.exists('config.txt'):
         pass
 with open('config.txt','r') as f:
     line = f.readline()
-    print(line)
+    logging.info("读取配置文件："+line)
     if len(line)>0:
         try:
             dictData = json.loads(line)
@@ -270,7 +274,8 @@ def save():
         messagebox.showinfo(title='提示',message='运行中，请勿重复运行')
         return
     dict = {'register':register.get(),'ip':ip.get(),
-    'port':port.get(),'useHeartBeat':useHeartBeat.get(),'heartBeatContent':heartBeatContent.get(),'heartBeatTime':heartBeatTime.get(),'status':status.get()}
+    'port':port.get(),'useHeartBeat':useHeartBeat.get(),'heartBeatContent':heartBeatContent.get(),
+    'heartBeatTime':heartBeatTime.get(),'status':status.get()}
     with open('config.txt','w+') as f:
         json.dump(dict,f)
     myThread(1,"socketThread").start()
@@ -280,6 +285,7 @@ ttk.Button(root,text='连接',command = save).place(relx=0.9, rely=0.9, anchor=C
 # 窗口关闭监听
 def on_closing():
     if messagebox.askokcancel("退出", "确定退出?"):
+        global exitFlag
         exitFlag = 1
         client.close()
         root.destroy()
