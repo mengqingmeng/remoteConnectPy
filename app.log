@@ -305,3 +305,19 @@ INFO 2020-01-02-11-11-34 root.py[line:68] 开始socket线程：socketThread
 INFO 2020-01-02-11-11-34 root.py[line:111] 发送心跳：11
 INFO 2020-01-02-11-11-34 root.py[line:153] socket连接成功
 INFO 2020-01-02-11-11-34 root.py[line:160] COM2打开成功
+ERROR 2020-01-02-11-16-10 root.py[line:165] 获取socket数据失败
+INFO 2020-01-02-11-16-10 root.py[line:292] 退出窗口，关闭coms
+INFO 2020-01-02-11-28-48 root.py[line:196] 读取配置文件：{"register": "3007", "ip": "127.0.0.1", "port": "7007", "useHeartBeat": 1, "heartBeatContent": "11", "heartBeatTime": 600, "status": -2}
+INFO 2020-01-02-11-28-57 root.py[line:293] 退出窗口，关闭coms
+INFO 2020-01-02-11-29-37 root.py[line:196] 读取配置文件：{"register": "3007", "ip": "127.0.0.1", "port": "7007", "useHeartBeat": 1, "heartBeatContent": "11", "heartBeatTime": 600, "status": -2}
+INFO 2020-01-02-11-29-44 root.py[line:293] 退出窗口，关闭coms
+INFO 2020-01-02-11-30-29 root.py[line:196] 读取配置文件：{"register": "3007", "ip": "127.0.0.1", "port": "7007", "useHeartBeat": 1, "heartBeatContent": "11", "heartBeatTime": 600, "status": -2}
+INFO 2020-01-02-11-33-29 root.py[line:293] 退出窗口，关闭coms
+INFO 2020-01-02-11-34-18 root.py[line:196] 读取配置文件：{"register": "3007", "ip": "127.0.0.1", "port": "7007", "useHeartBeat": 1, "heartBeatContent": "11", "heartBeatTime": 600, "status": -2}
+INFO 2020-01-02-11-34-21 root.py[line:293] 退出窗口，关闭coms
+INFO 2020-01-02-11-41-04 root.py[line:202] 读取配置文件：{"register": "3007", "ip": "127.0.0.1", "port": "7007", "useHeartBeat": 1, "heartBeatContent": "11", "heartBeatTime": 600, "status": -2}
+INFO 2020-01-02-11-41-08 root.py[line:299] 退出窗口，关闭coms
+INFO 2020-01-02-11-42-39 root.py[line:202] 读取配置文件：{"register": "3007", "ip": "127.0.0.1", "port": "7007", "useHeartBeat": 1, "heartBeatContent": "11", "heartBeatTime": 600, "status": -2}
+INFO 2020-01-02-11-42-43 root.py[line:299] 退出窗口，关闭coms
+INFO 2020-01-02-11-44-28 root.py[line:202] 读取配置文件：{"register": "3007", "ip": "127.0.0.1", "port": "7007", "useHeartBeat": 1, "heartBeatContent": "11", "heartBeatTime": 600, "status": -2}
+INFO 2020-01-02-11-44-31 root.py[line:299] 退出窗口，关闭coms

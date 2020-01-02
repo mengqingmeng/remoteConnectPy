@@ -6,6 +6,8 @@ import json,os,socket,threading,binascii,time,logging,codecs,re
 import serial
 import sys
 import glob,datetime,base64
+from icon import img
+
 # 用来标记socket线程的连接状态
 running = False 
 
@@ -175,6 +177,11 @@ def connectSocket(self,threadName):
 root = Tk()
 
 root.title('苏州奥丁电力-远程连接')
+tmp = open('tmp.ico', 'wb+')
+tmp.write(base64.b64decode(img))
+tmp.close()
+root.iconbitmap('tmp.ico')
+os.remove('tmp.ico')
 
 # 默认值
 registerHexVal = 0
